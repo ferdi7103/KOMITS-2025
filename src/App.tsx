@@ -46,8 +46,14 @@ import {
   LogOut,
   ChevronRight,
   Info,
-  Shirt
+  Shirt,
+  FileDown,
+  Printer,
+  Download
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { db, auth } from './lib/firebase';
 import { Order, OrderStatus, OperationType } from './types';
 
@@ -326,6 +332,118 @@ export default function App() {
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `orders/${orderId}`);
     }
+  };
+
+  const exportToExcel = () => {
+    if (!isAdmin) return;
+    const worksheet = XLSX.utils.json_to_sheet(orders.map(o => ({
+      ID: o.id,
+      Nama: o.name,
+      Telepon: o.phone,
+      Alamat: o.address,
+      Ukuran: o.size,
+      Warna: o.color,
+      Jumlah: o.quantity,
+      Status: o.status,
+      Tanggal: o.createdAt ? (o.createdAt as any).toDate().toLocaleString() : ''
+    })));
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Orders");
+    XLSX.writeFile(workbook, "Data_Preorder_KOMITS_2025.xlsx");
+  };
+
+  const generateInvoice = (order: Order) => {
+    const doc = new jsPDF();
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text("INVOICE RESMI", 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text("KOMITS 2025 OFFICIAL MERCHANDISE", 105, 28, { align: 'center' });
+    
+    // Horizontal line
+    doc.setLineWidth(0.5);
+    doc.line(20, 35, 190, 35);
+    
+    // Customer Info
+    doc.setFontSize(12);
+    doc.text(`No Pesanan: ${order.id?.slice(-8).toUpperCase()}`, 20, 45);
+    doc.text(`Tanggal: ${new Date().toLocaleDateString()}`, 20, 52);
+    
+    doc.text("Informasi Pelanggan:", 20, 70);
+    doc.setFontSize(10);
+    doc.text(`Nama: ${order.name}`, 20, 77);
+    doc.text(`WA: ${order.phone}`, 20, 83);
+    doc.text(`Alamat: ${order.address}`, 20, 89, { maxWidth: 100 });
+    
+    // Order Table
+    autoTable(doc, {
+      startY: 100,
+      head: [['Produk', 'Detail', 'Jumlah']],
+      body: [
+        ['Kaos KOMITS 2025', `${order.size} - ${order.color}`, `${order.quantity} pcs`],
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [37, 99, 235] },
+    });
+    
+    const finalY = (doc as any).lastAutoTable.finalY || 150;
+    
+    // Status
+    doc.setFontSize(12);
+    doc.setTextColor(37, 99, 235);
+    doc.text(`STATUS: ${order.status.toUpperCase()}`, 20, finalY + 20);
+    
+    // Footer
+    doc.setTextColor(150);
+    doc.setFontSize(8);
+    doc.text("Ini adalah dokumen resmi yang digenerate otomatis oleh sistem KOMITS 2025.", 105, 280, { align: 'center' });
+    
+    doc.save(`Invoice_${order.name.replace(/\s/g, '_')}.pdf`);
+  };
+
+  const generateShippingLabels = () => {
+    if (!isAdmin) return;
+    const doc = new jsPDF();
+    
+    let yPos = 20;
+    orders.filter(o => o.status === OrderStatus.VERIFIED || o.status === OrderStatus.PROCESSING).forEach((order, index) => {
+      if (index > 0 && index % 4 === 0) {
+        doc.addPage();
+        yPos = 20;
+      }
+      
+      const currentY = yPos + (index % 4) * 60;
+      
+      // Label Box
+      doc.setDrawColor(200);
+      doc.rect(20, currentY, 170, 55);
+      
+      // Label Header
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("PENGIRIM: KOMITS 2025 (Official Office)", 25, currentY + 10);
+      doc.text("0812-3456-7890", 25, currentY + 15);
+      
+      doc.line(20, currentY + 20, 190, currentY + 20);
+      
+      // Label Body
+      doc.text("PENERIMA:", 25, currentY + 30);
+      doc.setFontSize(14);
+      doc.text(order.name.toUpperCase(), 25, currentY + 38);
+      
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.text(`Tlp: ${order.phone}`, 25, currentY + 44);
+      doc.text(`Alamat: ${order.address}`, 25, currentY + 50, { maxWidth: 160 });
+      
+      // Order ID on corner
+      doc.setFontSize(8);
+      doc.text(`ID: ${order.id?.slice(-6).toUpperCase()}`, 160, currentY + 10);
+      doc.text(`${order.size} - ${order.color}`, 160, currentY + 15);
+    });
+    
+    doc.save("Label_Pengiriman_KOMITS_2025.pdf");
   };
 
   if (loading) {
@@ -637,9 +755,29 @@ export default function App() {
               className="space-y-6"
             >
               <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm overflow-hidden">
-                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                  {isAdmin ? 'Semua Pesanan (Admin)' : 'Pesanan Saya'}
+                <h3 className="text-lg font-bold mb-6 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
+                    {isAdmin ? 'Semua Pesanan (Admin)' : 'Pesanan Saya'}
+                  </div>
+                  {isAdmin && (
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={exportToExcel}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors"
+                      >
+                        <FileDown className="w-3.5 h-3.5" />
+                        Excel
+                      </button>
+                      <button 
+                        onClick={generateShippingLabels}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold hover:bg-blue-100 transition-colors"
+                      >
+                        <Printer className="w-3.5 h-3.5" />
+                        Label WA
+                      </button>
+                    </div>
+                  )}
                 </h3>
 
                 <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
@@ -738,6 +876,17 @@ export default function App() {
               </div>
 
               <div className="p-6 max-h-[80vh] overflow-y-auto custom-scrollbar space-y-6">
+                {/* Download Invoice Button for Verified Orders */}
+                {(selectedOrder.status === OrderStatus.VERIFIED || selectedOrder.status === OrderStatus.COMPLETED || isAdmin) && (
+                  <button 
+                    onClick={() => generateInvoice(selectedOrder)}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-50 text-blue-600 py-3 rounded-2xl font-bold text-sm hover:bg-blue-100 transition-colors border border-blue-100"
+                  >
+                    <Download className="w-4 h-4" />
+                    Download Invoice PDF
+                  </button>
+                )}
+
                 {/* Status Section */}
                 <div className="flex flex-col gap-4 bg-gray-50 p-4 rounded-2xl">
                   <div className="flex items-center justify-between">
