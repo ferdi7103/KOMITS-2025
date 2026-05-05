@@ -6,13 +6,27 @@ export enum OrderStatus {
   COMPLETED = 'completed'
 }
 
+export interface Product {
+  id?: string;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+  availableSizes: string[];
+  availableColors: string[];
+  isActive: boolean;
+  createdAt: any;
+}
+
 export interface Order {
   id?: string;
   userId: string;
+  productId: string;
+  productName?: string;
   name: string;
   phone: string;
   address: string;
-  size: 'S' | 'M' | 'L' | 'XL' | 'XXL' | 'XXXL';
+  size: string;
   color: string;
   quantity: number;
   paymentProofUrl: string;

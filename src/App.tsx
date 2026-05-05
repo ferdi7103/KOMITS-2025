@@ -56,7 +56,7 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db, auth } from './lib/firebase';
-import { Order, OrderStatus, OperationType } from './types';
+import { Order, OrderStatus, OperationType, Product } from './types';
 
 // Error Handler
 const handleFirestoreError = (error: unknown, operationType: OperationType, path: string | null) => {
@@ -86,16 +86,27 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [stockLimits, setStockLimits] = useState<Record<Order['size'], number>>({
-    'S': 50, 'M': 50, 'L': 50, 'XL': 50, 'XXL': 20, 'XXXL': 10
-  });
-  const [stockUsed, setStockUsed] = useState<Record<Order['size'], number>>({
-    'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0, 'XXXL': 0
-  });
+  const [products, setProducts] = useState<Product[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState<string>('');
+  const [stockLimits, setStockLimits] = useState<Record<string, number>>({});
+  const [stockUsed, setStockUsed] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [editingStock, setEditingStock] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Product Form State
+  const [productFormData, setProductFormData] = useState({
+    name: '',
+    description: '',
+    price: 0,
+    imageUrl: '',
+    availableSizes: 'S,M,L,XL,XXL,XXXL',
+    availableColors: 'Hitam,Putih,Navy,Maroon',
+    isActive: true
+  });
 
   // Search State
   const [searchPhone, setSearchPhone] = useState('');
@@ -166,26 +177,32 @@ export default function App() {
       }
     });
 
+    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      const productsData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Product[];
+      setProducts(productsData);
+      if (productsData.length > 0 && !selectedProductId) {
+        setSelectedProductId(productsData[0].id!);
+      }
+    });
+
     return () => {
       unsubscribe();
       unsubscribeStock();
+      unsubscribeProducts();
     };
   }, [user, isAdmin]);
 
   useEffect(() => {
     const usage = orders.reduce((acc, order) => {
-      acc[order.size] = (acc[order.size] || 0) + order.quantity;
+      const key = `${order.productId}_${order.size}`;
+      acc[key] = (acc[key] || 0) + order.quantity;
       return acc;
-    }, {} as Record<Order['size'], number>);
+    }, {} as Record<string, number>);
     
-    setStockUsed({
-      'S': usage['S'] || 0,
-      'M': usage['M'] || 0,
-      'L': usage['L'] || 0,
-      'XL': usage['XL'] || 0,
-      'XXL': usage['XXL'] || 0,
-      'XXXL': usage['XXXL'] || 0
-    });
+    setStockUsed(usage);
   }, [orders]);
 
   const syncToSheet = async (orderData: Partial<Order> & { id?: string }) => {
@@ -241,9 +258,17 @@ export default function App() {
 
     setSubmitting(true);
     try {
+      const selectedProduct = products.find(p => p.id === selectedProductId);
+      if (!selectedProduct) {
+        alert("Produk tidak ditemukan");
+        setSubmitting(false);
+        return;
+      }
+
       // Re-verify stock before submission
-      const currentUsed = stockUsed[formData.size];
-      const limit = stockLimits[formData.size];
+      const stockKey = `${selectedProductId}_${formData.size}`;
+      const currentUsed = stockUsed[stockKey] || 0;
+      const limit = stockLimits[stockKey] || 50; // Default limit
       if (currentUsed + formData.quantity > limit) {
         alert("Maaf, stok untuk ukuran ini baru saja habis atau tidak mencukupi.");
         setSubmitting(false);
@@ -252,6 +277,8 @@ export default function App() {
 
       const orderData = {
         userId: user.uid,
+        productId: selectedProductId,
+        productName: selectedProduct.name,
         ...formData,
         status: OrderStatus.PENDING,
         createdAt: serverTimestamp(),
@@ -318,7 +345,53 @@ export default function App() {
     }
   };
 
-  const saveStockLimits = async (newLimits: Record<Order['size'], number>) => {
+  const handleSubmitProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+    setSubmitting(true);
+    try {
+      const data = {
+        ...productFormData,
+        availableSizes: productFormData.availableSizes.split(',').map(s => s.trim()),
+        availableColors: productFormData.availableColors.split(',').map(c => c.trim()),
+        price: Number(productFormData.price),
+        createdAt: serverTimestamp()
+      };
+
+      if (editingProduct) {
+        await updateDoc(doc(db, 'products', editingProduct.id!), data);
+      } else {
+        await addDoc(collection(db, 'products'), data);
+      }
+      setIsAddingProduct(false);
+      setEditingProduct(null);
+      setProductFormData({
+        name: '',
+        description: '',
+        price: 0,
+        imageUrl: '',
+        availableSizes: 'S,M,L,XL,XXL,XXXL',
+        availableColors: 'Hitam,Putih,Navy,Maroon',
+        isActive: true
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'products');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    if (!isAdmin) return;
+    if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
+    try {
+      await deleteDoc(doc(db, 'products', productId));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, `products/${productId}`);
+    }
+  };
+
+  const saveStockLimits = async (newLimits: Record<string, number>) => {
     if (!isAdmin) return;
     try {
       const { setDoc } = await import('firebase/firestore');
@@ -541,64 +614,242 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white border border-red-200 rounded-3xl p-6 mb-8 shadow-sm"
+              className="bg-white border border-blue-200 rounded-3xl p-6 mb-8 shadow-sm"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
-                  <Info className="w-5 h-5" />
-                  Admin: Manajemen Stok
+                <h3 className="text-lg font-bold text-blue-600 flex items-center gap-2">
+                  <ShoppingBag className="w-5 h-5" />
+                  Admin: Manajemen Produk
                 </h3>
                 <button 
-                  onClick={() => setEditingStock(!editingStock)}
-                  className="text-sm font-bold text-blue-600 hover:underline"
+                  onClick={() => {
+                    setIsAddingProduct(true);
+                    setEditingProduct(null);
+                    setProductFormData({
+                      name: '',
+                      description: '',
+                      price: 0,
+                      imageUrl: '',
+                      availableSizes: 'S,M,L,XL,XXL,XXXL',
+                      availableColors: 'Hitam,Putih,Navy,Maroon',
+                      isActive: true
+                    });
+                  }}
+                  className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors"
                 >
-                  {editingStock ? 'Batal Edit' : 'Edit Kuota'}
+                  Tambah Produk Baru
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
-                {(['S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const).map(size => (
-                  <div key={size} className={`p-3 rounded-2xl border transition-all ${stockUsed[size] >= stockLimits[size] ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
-                    <p className="text-xs font-bold text-gray-400 mb-1">SIZE {size}</p>
-                    {editingStock ? (
-                      <input 
-                        type="number"
-                        className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold"
-                        defaultValue={stockLimits[size]}
-                        onBlur={(e) => {
-                          const newLimit = parseInt(e.target.value) || 0;
-                           // We don't save immediately on blur for simplicity, 
-                           // maybe user should click a save button or we do it here
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {products.map(product => (
+                  <div key={product.id} className="p-4 rounded-2xl border border-gray-100 bg-gray-50 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm">{product.name}</h4>
+                      <p className="text-xs text-gray-500">Rp {product.price.toLocaleString()}</p>
+                      <p className="text-[10px] text-gray-400 mt-1">{product.isActive ? 'Aktif' : 'Nonaktif'}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          setEditingProduct(product);
+                          setIsAddingProduct(true);
+                          setProductFormData({
+                            name: product.name,
+                            description: product.description,
+                            price: product.price,
+                            imageUrl: product.imageUrl,
+                            availableSizes: product.availableSizes.join(','),
+                            availableColors: product.availableColors.join(','),
+                            isActive: product.isActive
+                          });
                         }}
-                        onChange={(e) => {
-                          const val = parseInt(e.target.value) || 0;
-                          setStockLimits(prev => ({ ...prev, [size]: val }));
-                        }}
-                      />
-                    ) : (
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-lg font-bold">{stockUsed[size]}</span>
-                        <span className="text-xs text-gray-400">/ {stockLimits[size]}</span>
-                      </div>
-                    )}
-                    <div className="w-full bg-gray-200 h-1 rounded-full mt-2 overflow-hidden">
-                      <div 
-                        className={`h-full transition-all ${stockUsed[size] >= stockLimits[size] ? 'bg-red-500' : 'bg-blue-500'}`}
-                        style={{ width: `${Math.min(100, (stockUsed[size] / (stockLimits[size] || 1)) * 100)}%` }}
-                      />
+                        className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors"
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteProduct(product.id!)}
+                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
+                      >
+                        <LogOut className="w-4 h-4 rotate-90" />
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
-              
-              {editingStock && (
-                <button 
-                  onClick={() => saveStockLimits(stockLimits)}
-                  className="mt-6 w-full bg-blue-600 text-white font-bold py-2 rounded-xl hover:bg-blue-700 transition-colors"
-                >
-                  Simpan Semua Perubahan Kuota
-                </button>
-              )}
+
+              <AnimatePresence>
+                {isAddingProduct && (
+                  <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setIsAddingProduct(false)}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    />
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      className="relative bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl p-6"
+                    >
+                      <h3 className="font-bold text-xl mb-6">{editingProduct ? 'Edit Produk' : 'Tambah Produk'}</h3>
+                      <form onSubmit={handleSubmitProduct} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Nama Produk</label>
+                            <input 
+                              required
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm"
+                              value={productFormData.name}
+                              onChange={e => setProductFormData({...productFormData, name: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Harga (Rp)</label>
+                            <input 
+                              required
+                              type="number"
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm"
+                              value={productFormData.price}
+                              onChange={e => setProductFormData({...productFormData, price: parseInt(e.target.value) || 0})}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Deskripsi</label>
+                          <textarea 
+                            required
+                            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm min-h-[80px]"
+                            value={productFormData.description}
+                            onChange={e => setProductFormData({...productFormData, description: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-gray-400 uppercase">Image URL</label>
+                          <input 
+                            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm"
+                            value={productFormData.imageUrl}
+                            onChange={e => setProductFormData({...productFormData, imageUrl: e.target.value})}
+                            placeholder="https://example.com/image.jpg"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Ukuran (Pisahkan ,)</label>
+                            <input 
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm"
+                              value={productFormData.availableSizes}
+                              onChange={e => setProductFormData({...productFormData, availableSizes: e.target.value})}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-gray-400 uppercase">Warna (Pisahkan ,)</label>
+                            <input 
+                              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2 text-sm"
+                              value={productFormData.availableColors}
+                              onChange={e => setProductFormData({...productFormData, availableColors: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="checkbox"
+                            checked={productFormData.isActive}
+                            onChange={e => setProductFormData({...productFormData, isActive: e.target.checked})}
+                          />
+                          <label className="text-xs font-bold text-gray-600">Produk Aktif / Dijual</label>
+                        </div>
+                        <div className="flex gap-3 pt-4">
+                          <button 
+                            type="button"
+                            onClick={() => setIsAddingProduct(false)}
+                            className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors"
+                          >
+                            Batal
+                          </button>
+                          <button 
+                            type="submit"
+                            disabled={submitting}
+                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-2xl text-sm font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                          >
+                            {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+                            Simpan Produk
+                          </button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
+                    <Info className="w-5 h-5" />
+                    Admin: Manajemen Stok Per Item
+                  </h3>
+                  <button 
+                    onClick={() => setEditingStock(!editingStock)}
+                    className="text-sm font-bold text-blue-600 hover:underline"
+                  >
+                    {editingStock ? 'Batal Edit' : 'Edit Kuota'}
+                  </button>
+                </div>
+
+                <div className="space-y-6">
+                  {products.map(product => (
+                    <div key={product.id} className="bg-gray-50 p-4 rounded-2xl">
+                      <h5 className="text-xs font-bold text-gray-500 mb-3 uppercase tracking-wider">{product.name}</h5>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                        {product.availableSizes.map(size => {
+                          const stockKey = `${product.id}_${size}`;
+                          const used = stockUsed[stockKey] || 0;
+                          const limit = stockLimits[stockKey] || 50;
+                          return (
+                            <div key={size} className={`p-3 rounded-xl border transition-all ${used >= limit ? 'bg-red-50 border-red-100' : 'bg-white border-gray-100'}`}>
+                              <p className="text-[10px] font-bold text-gray-400 mb-1">SIZE {size}</p>
+                              {editingStock ? (
+                                <input 
+                                  type="number"
+                                  className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-[10px] font-bold"
+                                  defaultValue={limit}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    setStockLimits(prev => ({ ...prev, [stockKey]: val }));
+                                  }}
+                                />
+                              ) : (
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-base font-bold">{used}</span>
+                                  <span className="text-[10px] text-gray-400">/ {limit}</span>
+                                </div>
+                              )}
+                              <div className="w-full bg-gray-200 h-1 rounded-full mt-2 overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all ${used >= limit ? 'bg-red-500' : 'bg-blue-500'}`}
+                                  style={{ width: `${Math.min(100, (used / (limit || 1)) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {editingStock && (
+                  <button 
+                    onClick={() => saveStockLimits(stockLimits)}
+                    className="mt-6 w-full bg-blue-600 text-white font-bold py-2 rounded-xl hover:bg-blue-700 transition-colors"
+                  >
+                    Simpan Semua Perubahan Kuota Stok
+                  </button>
+                )}
+              </div>
             </motion.div>
           )}
 
@@ -646,7 +897,8 @@ export default function App() {
                         <div key={order.id} className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
                           <div>
                             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">ID: {order.id}</p>
-                            <p className="text-sm font-bold text-gray-800">{order.size} - {order.color} ({order.quantity} pcs)</p>
+                            <p className="text-sm font-bold text-gray-800">{order.productName}</p>
+                            <p className="text-xs text-gray-600">{order.size} - {order.color} ({order.quantity} pcs)</p>
                             <p className="text-xs text-gray-400">Atas nama: {order.name}</p>
                           </div>
                           <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded-full ${
@@ -698,6 +950,19 @@ export default function App() {
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Pilih Produk</label>
+                    <select 
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
+                      value={selectedProductId}
+                      onChange={e => setSelectedProductId(e.target.value)}
+                    >
+                      {products.filter(p => p.isActive || isAdmin).map(product => (
+                        <option key={product.id} value={product.id}>{product.name} (Rp {product.price.toLocaleString()})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Nama Lengkap</label>
                     <input 
                       required
@@ -744,11 +1009,12 @@ export default function App() {
                         <select 
                           className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
                           value={formData.size}
-                          onChange={e => setFormData({ ...formData, size: e.target.value as Order['size'] })}
+                          onChange={e => setFormData({ ...formData, size: e.target.value })}
                         >
-                          {(['S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const).map(s => {
-                            const used = stockUsed[s] || 0;
-                            const limit = stockLimits[s] || 0;
+                          {(products.find(p => p.id === selectedProductId)?.availableSizes || ['S', 'M', 'L', 'XL', 'XXL', 'XXXL']).map(s => {
+                            const stockKey = `${selectedProductId}_${s}`;
+                            const used = stockUsed[stockKey] || 0;
+                            const limit = stockLimits[stockKey] || 50;
                             const isSoldOut = used >= limit;
                             return (
                               <option key={s} value={s} disabled={isSoldOut}>
@@ -765,7 +1031,7 @@ export default function App() {
                         value={formData.color}
                         onChange={e => setFormData({ ...formData, color: e.target.value })}
                       >
-                        {['Hitam', 'Putih', 'Navy', 'Maroon'].map(c => (
+                        {(products.find(p => p.id === selectedProductId)?.availableColors || ['Hitam', 'Putih', 'Navy', 'Maroon']).map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
@@ -884,7 +1150,8 @@ export default function App() {
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Order ID: {order.id?.slice(-6).toUpperCase()}</p>
-                            <h4 className="font-bold text-gray-800">{order.size} - {order.color}</h4>
+                            <h4 className="font-bold text-gray-800">{order.productName || 'Produk'}</h4>
+                            <p className="text-[10px] text-gray-500">{order.size} - {order.color}</p>
                           </div>
                           <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
                             order.status === OrderStatus.PENDING ? 'bg-orange-100 text-orange-600' :
@@ -1026,7 +1293,7 @@ export default function App() {
                       <Shirt className="w-8 h-8 text-blue-600" />
                     </div>
                     <div>
-                      <p className="font-bold text-lg">Kaos KOMITS 2025</p>
+                      <p className="font-bold text-lg">{selectedOrder.productName || 'Kaos KOMITS 2025'}</p>
                       <p className="text-sm text-gray-500">{selectedOrder.size} • {selectedOrder.color} • {selectedOrder.quantity} pcs</p>
                     </div>
                   </div>

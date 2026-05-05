@@ -111,6 +111,7 @@ async function startServer() {
           id: doc.id.slice(-6).toUpperCase(),
           name: data.name.split(' ')[0] + '***', // Masking name for privacy
           status: data.status,
+          productName: data.productName || "Kaos KOMITS 2025",
           size: data.size,
           color: data.color,
           quantity: data.quantity,
