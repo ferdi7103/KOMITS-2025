@@ -89,6 +89,42 @@ async function startServer() {
     res.json({ status: "success" });
   });
 
+  // API Route for Public Status Check by Phone
+  app.get("/api/order-status/:phone", async (req, res) => {
+    const { phone } = req.params;
+    if (!phone || !db) return res.status(400).json({ error: "Missing phone" });
+
+    try {
+      const snapshot = await db.collection("orders")
+        .where("phone", "==", phone)
+        .orderBy("createdAt", "desc")
+        .limit(5)
+        .get();
+
+      if (snapshot.empty) {
+        return res.json({ orders: [] });
+      }
+
+      const orders = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id.slice(-6).toUpperCase(),
+          name: data.name.split(' ')[0] + '***', // Masking name for privacy
+          status: data.status,
+          size: data.size,
+          color: data.color,
+          quantity: data.quantity,
+          createdAt: data.createdAt?.toDate().toISOString() || null
+        };
+      });
+
+      res.json({ orders });
+    } catch (error) {
+      console.error("Status check error:", error);
+      res.status(500).json({ error: "Failed to check status" });
+    }
+  });
+
   // Background Task: Payment Reminder (Every 24 hours)
   const runReminders = async () => {
     if (!db) return;

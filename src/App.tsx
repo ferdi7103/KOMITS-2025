@@ -49,7 +49,8 @@ import {
   Shirt,
   FileDown,
   Printer,
-  Download
+  Download,
+  Search
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -95,6 +96,12 @@ export default function App() {
   const [editingStock, setEditingStock] = useState(false);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  // Search State
+  const [searchPhone, setSearchPhone] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -321,6 +328,22 @@ export default function App() {
       handleFirestoreError(error, OperationType.UPDATE, 'settings/stock');
     }
     setEditingStock(false);
+  };
+
+  const handlePublicSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchPhone) return;
+    setSearching(true);
+    setHasSearched(true);
+    try {
+      const res = await fetch(`/api/order-status/${searchPhone}`);
+      const data = await res.json();
+      setSearchResults(data.orders || []);
+    } catch (error) {
+      console.error("Search error:", error);
+    } finally {
+      setSearching(false);
+    }
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -580,7 +603,69 @@ export default function App() {
           )}
 
         {!user ? (
-          <div className="text-center bg-white border border-gray-200 rounded-3xl p-12 shadow-sm">
+          <div className="space-y-8">
+            {/* Search Tool for Non-Logged In */}
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm"
+            >
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Search className="w-5 h-5 text-blue-600" />
+                Cek Status Pesanan Mandiri
+              </h3>
+              <form onSubmit={handlePublicSearch} className="flex flex-col sm:flex-row gap-3">
+                <input 
+                  type="tel"
+                  placeholder="Masukkan Nomor WhatsApp (contoh: 0812...)"
+                  className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm font-medium"
+                  value={searchPhone}
+                  onChange={(e) => setSearchPhone(e.target.value)}
+                />
+                <button 
+                  type="submit"
+                  disabled={searching}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold px-6 py-3 rounded-2xl transition-all flex items-center justify-center gap-2"
+                >
+                  {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  Cek Status
+                </button>
+              </form>
+
+              <AnimatePresence>
+                {hasSearched && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mt-6 pt-6 border-t border-gray-100 space-y-3"
+                  >
+                    {searchResults.length === 0 ? (
+                      <p className="text-center text-sm text-gray-500 py-4">Tidak ditemukan pesanan untuk nomor ini.</p>
+                    ) : (
+                      searchResults.map((order) => (
+                        <div key={order.id} className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                          <div>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">ID: {order.id}</p>
+                            <p className="text-sm font-bold text-gray-800">{order.size} - {order.color} ({order.quantity} pcs)</p>
+                            <p className="text-xs text-gray-400">Atas nama: {order.name}</p>
+                          </div>
+                          <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded-full ${
+                            order.status === 'pending' ? 'bg-orange-100 text-orange-600' :
+                            order.status === 'verified' ? 'bg-green-600 text-white' :
+                            'bg-blue-600 text-white'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            <div className="text-center bg-white border border-gray-200 rounded-3xl p-12 shadow-sm">
+
             <div className="bg-blue-50 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Info className="w-8 h-8 text-blue-600" />
             </div>
@@ -596,6 +681,7 @@ export default function App() {
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
+        </div>
         ) : (
           <div className="grid md:grid-cols-2 gap-8">
             {/* Form Section */}
