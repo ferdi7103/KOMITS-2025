@@ -54,7 +54,9 @@ import {
   LayoutDashboard,
   BarChart3,
   PieChart as PieChartIcon,
-  TrendingUp
+  TrendingUp,
+  PlusCircle,
+  AlertTriangle
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
@@ -111,8 +113,10 @@ export default function App() {
   const [editingStock, setEditingStock] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeTab, setActiveTab] = useState<'preorder' | 'history' | 'stats' | 'products'>('preorder');
   const [activeAdminTab, setActiveAdminTab] = useState<'orders' | 'stats' | 'products'>('orders');
 
   // Product Form State
@@ -399,13 +403,21 @@ export default function App() {
     }
   };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteProduct = (productId: string) => {
     if (!isAdmin) return;
-    if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
+    setProductToDelete(productId);
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!productToDelete) return;
+    setSubmitting(true);
     try {
-      await deleteDoc(doc(db, 'products', productId));
+      await deleteDoc(doc(db, 'products', productToDelete));
+      setProductToDelete(null);
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, `products/${productId}`);
+      handleFirestoreError(error, OperationType.DELETE, `products/${productToDelete}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -645,138 +657,176 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 pt-8">
-        {isAdmin && (
-          <div className="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
-            <button 
-              onClick={() => setActiveAdminTab('orders')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'orders' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <ClipboardList className="w-4 h-4" />
-              Pesanan
-            </button>
-            <button 
-              onClick={() => setActiveAdminTab('stats')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              Statistik
-            </button>
-            <button 
-              onClick={() => setActiveAdminTab('products')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'products' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              <ShoppingBag className="w-4 h-4" />
-              Produk
-            </button>
+        {user && (
+          <div className="mb-10 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="flex gap-2 bg-gray-100/80 backdrop-blur-sm p-1.5 rounded-[1.25rem] w-fit max-w-full overflow-x-auto no-scrollbar scroll-smooth">
+              {isAdmin ? (
+                <>
+                  <button 
+                    onClick={() => { setActiveTab('preorder'); setActiveAdminTab('orders'); }}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[13px] font-black whitespace-nowrap transition-all active:scale-95 ${activeTab === 'preorder' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    PESANAN
+                  </button>
+                  <button 
+                    onClick={() => { setActiveTab('stats'); setActiveAdminTab('stats'); }}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[13px] font-black whitespace-nowrap transition-all active:scale-95 ${activeTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <BarChart3 className="w-4 h-4" />
+                    STATISTIK
+                  </button>
+                  <button 
+                    onClick={() => { setActiveTab('products'); setActiveAdminTab('products'); }}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[13px] font-black whitespace-nowrap transition-all active:scale-95 ${activeTab === 'products' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <ShoppingBag className="w-4 h-4" />
+                    PRODUK
+                  </button>
+                  <div className="w-px h-6 bg-gray-200 self-center mx-1 shrink-0" />
+                  <button 
+                    onClick={() => setActiveTab('form')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[13px] font-black whitespace-nowrap transition-all active:scale-95 ${activeTab === 'form' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    BUAT PESANAN
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={() => setActiveTab('preorder')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[13px] font-black transition-all active:scale-95 ${activeTab === 'preorder' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <Shirt className="w-4 h-4" />
+                    PREORDER BARU
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('history')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl text-[13px] font-black transition-all active:scale-95 ${activeTab === 'history' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    RIWAYAT
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Banner */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 mb-8 text-white relative overflow-hidden"
-        >
-          <div className="relative z-10">
-            <p className="text-blue-100 font-mono text-xs uppercase tracking-widest mb-2">Exclusive Release</p>
-            <h2 className="text-4xl font-extrabold mb-4 leading-tight">KOMITS 2025<br />Pre Order System</h2>
-            <p className="text-blue-100 max-w-md opacity-90 leading-relaxed">
-              Dapatkan kaos official KOMITS 2025 edisi terbatas. Pilih ukuran, warna favorit, dan miliki sekarang!
-            </p>
-          </div>
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-            <div className="absolute bottom-0 right-12 opacity-10">
-              <Shirt size={200} />
+        {/* Banner - Only show on Preorder Tab or when not logged in */}
+        {(!user || activeTab === 'preorder' || activeTab === 'form') && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] p-6 sm:p-8 mb-8 text-white relative overflow-hidden"
+          >
+            <div className="relative z-10">
+              <p className="text-blue-100 font-mono text-[10px] sm:text-xs uppercase tracking-widest mb-2">Exclusive Release</p>
+              <h2 className="text-2xl sm:text-4xl font-extrabold mb-3 leading-tight">KOMITS 2025<br />Pre Order System</h2>
+              <p className="text-blue-100 max-w-sm text-sm sm:text-base opacity-90 leading-relaxed">
+                Dapatkan kaos official KOMITS 2025 edisi terbatas. Pilih ukuran, warna favorit, dan miliki sekarang!
+              </p>
+            </div>
+            <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
+            <div className="absolute bottom-0 right-4 sm:right-12 opacity-10">
+              <Shirt size={120} className="sm:w-[200px] sm:h-[200px]" />
             </div>
           </motion.div>
+        )}
 
           {isAdmin && activeAdminTab === 'stats' && (
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="space-y-8 mb-12"
+              className="space-y-6 sm:space-y-8 mb-12"
             >
               {/* Stat Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <div className="bg-blue-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
-                    <TrendingUp className="w-5 h-5 text-blue-600" />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                <div className="bg-white p-6 rounded-[2rem] border border-blue-50 shadow-sm">
+                  <div className="bg-blue-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-5">
+                    <TrendingUp className="w-6 h-6 text-blue-600" />
                   </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Total Pendapatan</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Total Pendapatan</p>
                   <h4 className="text-2xl font-black text-gray-900">Rp {totalRevenue.toLocaleString()}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">*Berdasarkan pesanan non-pending</p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic font-medium">*Non-pending orders</p>
                 </div>
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <div className="bg-green-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                <div className="bg-white p-6 rounded-[2rem] border border-green-50 shadow-sm">
+                  <div className="bg-green-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-5">
+                    <CheckCircle2 className="w-6 h-6 text-green-600" />
                   </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Pesanan Sukses</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Pesanan Sukses</p>
                   <h4 className="text-2xl font-black text-gray-900">{orders.filter(o => o.status === OrderStatus.COMPLETED || o.status === OrderStatus.VERIFIED).length}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Verified & Completed</p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic font-medium">Verified & Completed</p>
                 </div>
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <div className="bg-orange-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
-                    <Loader2 className="w-5 h-5 text-orange-600" />
+                <div className="bg-white p-6 rounded-[2rem] border border-orange-50 shadow-sm">
+                  <div className="bg-orange-50 w-12 h-12 rounded-2xl flex items-center justify-center mb-5">
+                    <Loader2 className="w-6 h-6 text-orange-600" />
                   </div>
-                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Menunggu Verifikasi</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Proses Verifikasi</p>
                   <h4 className="text-2xl font-black text-gray-900">{orders.filter(o => o.status === OrderStatus.PENDING).length}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Status: Pending</p>
+                  <p className="text-[10px] text-gray-400 mt-2 italic font-medium">Status: Pending</p>
                 </div>
               </div>
 
               {/* Charts */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-h-[400px]">
-                  <h4 className="font-bold mb-6 flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-blue-600" />
-                    Popularitas Warna
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8">
+                <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm min-h-[380px] sm:min-h-[450px]">
+                  <h4 className="font-black text-gray-800 mb-8 flex items-center gap-2 text-sm sm:text-base tracking-tight">
+                    <div className="bg-blue-100 p-1.5 rounded-lg">
+                      <BarChart3 className="w-4 h-4 text-blue-600" />
+                    </div>
+                    POPULARITAS WARNA
                   </h4>
-                  <div className="h-[300px] w-full">
+                  <div className="h-[250px] sm:h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={colorChartData}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                        <XAxis dataKey="name" fontSize={11} stroke="#9CA3AF" />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                        <XAxis dataKey="name" fontSize={10} stroke="#9CA3AF" axisLine={false} tickLine={false} />
                         <YAxis hide />
                         <Tooltip 
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
-                          itemStyle={{ fontWeight: 'bold' }}
+                          cursor={{ fill: '#F9FAFB', radius: 8 }}
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px' }}
+                          itemStyle={{ fontWeight: '800', fontSize: '12px' }}
                         />
                         <Bar 
                           dataKey="value" 
                           fill="#2563eb" 
-                          radius={[6, 6, 0, 0]} 
+                          radius={[8, 8, 0, 0]} 
                           animationDuration={1500}
+                          barSize={32}
                         />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-h-[400px]">
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-bold flex items-center gap-2">
+                <div className="bg-white p-6 sm:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm min-h-[380px] sm:min-h-[450px]">
+                  <h4 className="font-black text-gray-800 mb-8 flex items-center gap-2 text-sm sm:text-base tracking-tight">
+                    <div className="bg-indigo-100 p-1.5 rounded-lg">
                       <PieChartIcon className="w-4 h-4 text-indigo-600" />
-                      Status Pembayaran
-                    </h4>
-                  </div>
-                  <div className="h-[300px] w-full">
+                    </div>
+                    STATUS PEMBAYARAN
+                  </h4>
+                  <div className="h-[250px] sm:h-[300px] w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
                           data={statusChartData}
                           innerRadius={60}
-                          outerRadius={80}
-                          paddingAngle={5}
+                          outerRadius={85}
+                          paddingAngle={8}
                           dataKey="value"
+                          stroke="none"
                         >
                           {statusChartData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} cornerRadius={8} />
                           ))}
                         </Pie>
                         <Tooltip 
-                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)', padding: '12px' }}
                         />
-                        <Legend iconType="circle" />
+                        <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px', fontSize: '11px', fontWeight: 'bold' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -843,12 +893,13 @@ export default function App() {
                       >
                         <Info className="w-4 h-4" />
                       </button>
-                      <button 
-                        onClick={() => handleDeleteProduct(product.id!)}
-                        className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                      >
-                        <LogOut className="w-4 h-4 rotate-90" />
-                      </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id!)}
+                          className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors group"
+                          title="Hapus Produk"
+                        >
+                          <LogOut className="w-4 h-4 rotate-90 group-hover:scale-110 transition-transform" />
+                        </button>
                     </div>
                   </div>
                 ))}
@@ -960,6 +1011,51 @@ export default function App() {
                 )}
               </AnimatePresence>
 
+              {/* Delete Product Confirmation Modal */}
+              <AnimatePresence>
+                {productToDelete && (
+                  <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setProductToDelete(null)}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                    />
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                      className="relative bg-white w-full max-w-sm rounded-[2.5rem] overflow-hidden shadow-2xl p-8 text-center"
+                    >
+                      <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <AlertTriangle className="w-10 h-10 text-red-500" />
+                      </div>
+                      <h3 className="text-xl font-black text-gray-900 mb-3">Hapus Produk?</h3>
+                      <p className="text-gray-500 text-sm leading-relaxed mb-8">
+                        Tindakan ini tidak dapat dibatalkan. Apakah Anda yakin ingin menghapus produk ini secara permanen?
+                      </p>
+                      <div className="flex flex-col gap-3">
+                        <button 
+                          onClick={confirmDeleteProduct}
+                          disabled={submitting}
+                          className="w-full bg-red-600 hover:bg-red-700 disabled:bg-red-300 text-white font-black py-4 rounded-2xl transition-all shadow-lg shadow-red-100 flex items-center justify-center gap-2"
+                        >
+                          {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Ya, Hapus Permanen'}
+                        </button>
+                        <button 
+                          onClick={() => setProductToDelete(null)}
+                          disabled={submitting}
+                          className="w-full bg-gray-50 hover:bg-gray-100 text-gray-600 font-bold py-4 rounded-2xl transition-all"
+                        >
+                          Batalkan
+                        </button>
+                      </div>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
               <div className="mt-8 pt-6 border-t border-gray-100">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
@@ -1034,24 +1130,26 @@ export default function App() {
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm"
+              className="bg-white border border-gray-200 rounded-[2.5rem] p-6 sm:p-8 shadow-sm"
             >
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Search className="w-5 h-5 text-blue-600" />
-                Cek Status Pesanan Mandiri
+              <h3 className="text-lg sm:text-xl font-bold mb-5 flex items-center gap-2">
+                <div className="bg-blue-50 p-2 rounded-xl">
+                  <Search className="w-5 h-5 text-blue-600" />
+                </div>
+                Cek Status Pesanan
               </h3>
               <form onSubmit={handlePublicSearch} className="flex flex-col sm:flex-row gap-3">
                 <input 
                   type="tel"
-                  placeholder="Masukkan Nomor WhatsApp (contoh: 0812...)"
-                  className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-600 transition-all text-sm font-medium"
+                  placeholder="Nomor WhatsApp (08...)"
+                  className="flex-1 bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 sm:py-3.5 outline-none focus:ring-2 focus:ring-blue-600 focus:bg-white transition-all text-sm font-semibold"
                   value={searchPhone}
                   onChange={(e) => setSearchPhone(e.target.value)}
                 />
                 <button 
                   type="submit"
                   disabled={searching}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold px-6 py-3 rounded-2xl transition-all flex items-center justify-center gap-2"
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold px-8 py-4 sm:py-3.5 rounded-2xl transition-all flex items-center justify-center gap-2 active:scale-95 touch-manipulation shadow-lg shadow-blue-100"
                 >
                   {searching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   Cek Status
@@ -1063,23 +1161,26 @@ export default function App() {
                   <motion.div 
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
-                    className="mt-6 pt-6 border-t border-gray-100 space-y-3"
+                    className="mt-8 pt-8 border-t border-gray-50 space-y-4"
                   >
                     {searchResults.length === 0 ? (
-                      <p className="text-center text-sm text-gray-500 py-4">Tidak ditemukan pesanan untuk nomor ini.</p>
+                      <div className="text-center py-8">
+                        <p className="text-sm text-gray-500 font-medium">Tidak ditemukan pesanan untuk nomor ini.</p>
+                        <p className="text-[10px] text-gray-400 mt-1">Pastikan nomor yang dimasukkan benar.</p>
+                      </div>
                     ) : (
                       searchResults.map((order) => (
-                        <div key={order.id} className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                          <div>
-                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">ID: {order.id}</p>
-                            <p className="text-sm font-bold text-gray-800">{order.productName}</p>
-                            <p className="text-xs text-gray-600">{order.size} - {order.color} ({order.quantity} pcs)</p>
-                            <p className="text-xs text-gray-400">Atas nama: {order.name}</p>
+                        <div key={order.id} className="flex items-center justify-between bg-gray-50/50 p-5 rounded-[1.5rem] border border-gray-100/50">
+                          <div className="min-w-0 pr-3">
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-1.5">ID: {order.id}</p>
+                            <p className="text-sm font-bold text-gray-900 truncate leading-tight mb-1">{order.productName}</p>
+                            <p className="text-[11px] text-gray-500 font-medium">{order.size} • {order.color} • {order.quantity} pcs</p>
+                            <p className="text-[10px] text-gray-400 mt-1 italic">Atas nama: {order.name}</p>
                           </div>
-                          <span className={`text-[10px] uppercase font-bold px-3 py-1.5 rounded-full ${
+                          <span className={`text-[10px] uppercase font-black px-4 py-2 rounded-xl shrink-0 tracking-widest ${
                             order.status === 'pending' ? 'bg-orange-100 text-orange-600' :
-                            order.status === 'verified' ? 'bg-green-600 text-white' :
-                            'bg-blue-600 text-white'
+                            order.status === 'verified' ? 'bg-green-600 text-white shadow-sm shadow-green-100' :
+                            'bg-blue-600 text-white shadow-sm shadow-blue-100'
                           }`}>
                             {order.status}
                           </span>
@@ -1109,183 +1210,197 @@ export default function App() {
             </button>
           </div>
         </div>
-        ) : user && activeAdminTab === 'orders' ? (
-          <div className="grid md:grid-cols-2 gap-8">
-            {/* Form Section */}
-            <motion.section 
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-6"
-            >
-              <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
-                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5 text-blue-600" />
-                  Form Preorder
-                </h3>
+        ) : user && (activeTab === 'preorder' || activeTab === 'form') ? (
+            <div className="max-w-xl mx-auto">
+              {/* Form Section */}
+              <motion.section 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-6"
+              >
+                <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm">
+                  <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <Shirt className="w-5 h-5 text-blue-600" />
+                    Formulir Preorder
+                  </h3>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Pilih Produk</label>
-                    <select 
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
-                      value={selectedProductId}
-                      onChange={e => setSelectedProductId(e.target.value)}
-                    >
-                      {products.filter(p => p.isActive || isAdmin).map(product => (
-                        <option key={product.id} value={product.id}>{product.name} (Rp {product.price.toLocaleString()})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Nama Lengkap</label>
-                    <input 
-                      required
-                      type="text"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
-                      placeholder="Contoh: Budi Santoso"
-                      value={formData.name}
-                      onChange={e => setFormData({ ...formData, name: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">No Telepon / WA</label>
-                    <div className="relative">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <input 
-                        required
-                        type="tel"
-                        className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
-                        placeholder="081234567890"
-                        value={formData.phone}
-                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Alamat Pengiriman</label>
-                    <div className="relative">
-                      <MapPin className="absolute left-4 top-3 w-4 h-4 text-gray-400" />
-                      <textarea 
-                        required
-                        className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all min-h-[100px] resize-none"
-                        placeholder="Tuliskan alamat lengkap pengiriman..."
-                        value={formData.address}
-                        onChange={e => setFormData({ ...formData, address: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Ukuran</label>
-                        <select 
-                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
-                          value={formData.size}
-                          onChange={e => setFormData({ ...formData, size: e.target.value })}
-                        >
-                          {(products.find(p => p.id === selectedProductId)?.availableSizes || ['S', 'M', 'L', 'XL', 'XXL', 'XXXL']).map(s => {
-                            const stockKey = `${selectedProductId}_${s}`;
-                            const used = stockUsed[stockKey] || 0;
-                            const limit = stockLimits[stockKey] || 50;
-                            const isSoldOut = used >= limit;
-                            return (
-                              <option key={s} value={s} disabled={isSoldOut}>
-                                {s} {isSoldOut ? '(SOLD OUT)' : `(Stok: ${limit - used})`}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                      <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Warna</label>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Pilih Produk</label>
                       <select 
-                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
-                        value={formData.color}
-                        onChange={e => setFormData({ ...formData, color: e.target.value })}
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
+                        value={selectedProductId}
+                        onChange={e => setSelectedProductId(e.target.value)}
                       >
-                        {(products.find(p => p.id === selectedProductId)?.availableColors || ['Hitam', 'Putih', 'Navy', 'Maroon']).map(c => (
-                          <option key={c} value={c}>{c}</option>
+                        {products.filter(p => p.isActive || isAdmin).map(product => (
+                          <option key={product.id} value={product.id}>{product.name} (Rp {product.price.toLocaleString()})</option>
                         ))}
                       </select>
                     </div>
-                  </div>
 
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Jumlah</label>
-                    <input 
-                      type="number"
-                      min="1"
-                      max="100"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
-                      value={formData.quantity}
-                      onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Bukti Pembayaran</label>
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:bg-gray-50 ${formData.paymentProofUrl ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
-                    >
-                      {formData.paymentProofUrl ? (
-                        <>
-                          <CheckCircle2 className="w-8 h-8 text-green-500" />
-                          <span className="text-xs font-bold text-green-600">Berhasil diupload</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-8 h-8 text-gray-300" />
-                          <span className="text-xs font-medium text-gray-400">Klik untuk upload bukti</span>
-                        </>
-                      )}
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Nama Lengkap</label>
+                      <input 
+                        required
+                        type="text"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
+                        placeholder="Contoh: Budi Santoso"
+                        value={formData.name}
+                        onChange={e => setFormData({ ...formData, name: e.target.value })}
+                      />
                     </div>
-                    <input 
-                      type="file"
-                      ref={fileInputRef}
-                      hidden
-                      accept="image/*"
-                      onChange={handleFileUpload}
-                    />
-                  </div>
 
-                  <button 
-                    disabled={submitting}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-100 mt-4 flex items-center justify-center gap-2"
-                  >
-                    {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Kirim Preorder Sekarang'}
-                  </button>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">No Telepon / WA</label>
+                      <div className="relative">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input 
+                          required
+                          type="tel"
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
+                          placeholder="081234567890"
+                          value={formData.phone}
+                          onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                        />
+                      </div>
+                    </div>
 
-                  <AnimatePresence>
-                    {success && (
-                      <motion.div 
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        className="bg-green-50 text-green-700 p-4 rounded-xl text-center text-sm font-medium border border-green-100"
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Alamat Pengiriman</label>
+                      <div className="relative">
+                        <MapPin className="absolute left-4 top-3 w-4 h-4 text-gray-400" />
+                        <textarea 
+                          required
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-11 pr-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all min-h-[100px] resize-none"
+                          placeholder="Tuliskan alamat lengkap pengiriman..."
+                          value={formData.address}
+                          onChange={e => setFormData({ ...formData, address: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Ukuran</label>
+                          <select 
+                            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
+                            value={formData.size}
+                            onChange={e => setFormData({ ...formData, size: e.target.value })}
+                          >
+                            {(products.find(p => p.id === selectedProductId)?.availableSizes || ['S', 'M', 'L', 'XL', 'XXL', 'XXXL']).map(s => {
+                              const stockKey = `${selectedProductId}_${s}`;
+                              const used = stockUsed[stockKey] || 0;
+                              const limit = stockLimits[stockKey] || 50;
+                              const isSoldOut = used >= limit;
+                              return (
+                                <option key={s} value={s} disabled={isSoldOut}>
+                                  {s} {isSoldOut ? '(SOLD OUT)' : `(Stok: ${limit - used})`}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Warna</label>
+                        <select 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
+                          value={formData.color}
+                          onChange={e => setFormData({ ...formData, color: e.target.value })}
+                        >
+                          {(products.find(p => p.id === selectedProductId)?.availableColors || ['Hitam', 'Putih', 'Navy', 'Maroon']).map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Jumlah</label>
+                      <input 
+                        type="number"
+                        min="1"
+                        max="100"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all"
+                        value={formData.quantity}
+                        onChange={e => setFormData({ ...formData, quantity: parseInt(e.target.value) || 1 })}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Bukti Pembayaran</label>
+                      <div 
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-2xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all hover:bg-gray-50 ${formData.paymentProofUrl ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}
                       >
-                        Pesanan Anda berhasil dikirim!
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </form>
-              </div>
-            </motion.section>
+                        {formData.paymentProofUrl ? (
+                          <>
+                            <CheckCircle2 className="w-8 h-8 text-green-500" />
+                            <span className="text-xs font-bold text-green-600">Berhasil diupload</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 text-gray-300" />
+                            <span className="text-xs font-medium text-gray-400">Klik untuk upload bukti</span>
+                          </>
+                        )}
+                      </div>
+                      <input 
+                        type="file"
+                        ref={fileInputRef}
+                        hidden
+                        accept="image/*"
+                        onChange={handleFileUpload}
+                      />
+                    </div>
 
-            {/* Orders Tracking */}
+                    <button 
+                      disabled={submitting}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-100 mt-4 flex items-center justify-center gap-2"
+                    >
+                      {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Kirim Preorder Sekarang'}
+                    </button>
+
+                    <AnimatePresence>
+                      {success && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="bg-green-50 text-green-700 p-4 rounded-xl text-center text-sm font-medium border border-green-100"
+                        >
+                          Pesanan Anda berhasil dikirim!
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </form>
+                </div>
+
+                {/* Info Card - Simplified for single column */}
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3 text-amber-800">
+                  <Info className="w-5 h-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold mb-1">Informasi Pembayaran</p>
+                    <p className="text-xs leading-relaxed opacity-80">
+                      Transfer ke rekening <strong>Bank ABC 123456789 a.n. KOMITS</strong>. 
+                      Upload bukti transfer untuk verifikasi.
+                    </p>
+                  </div>
+                </div>
+              </motion.section>
+            </div>
+        ) : user && (activeTab === 'history' || (isAdmin && activeTab === 'preorder')) ? (
+          <div className="w-full">
+            {/* Orders Tracking - Full Width */}
             <motion.section 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
               <div className="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm overflow-hidden">
                 <h3 className="text-lg font-bold mb-6 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-blue-600" />
-                    {isAdmin ? 'Semua Pesanan (Admin)' : 'Pesanan Saya'}
+                    <ClipboardList className="w-5 h-5 text-blue-600" />
+                    {isAdmin ? 'Manajemen Pesanan' : 'Riwayat Pesanan Anda'}
                   </div>
                   {isAdmin && (
                     <div className="flex gap-2">
@@ -1307,10 +1422,18 @@ export default function App() {
                   )}
                 </h3>
 
-                <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[800px] overflow-y-auto pr-2 custom-scrollbar">
                   {orders.length === 0 ? (
-                    <div className="text-center py-12">
+                    <div className="text-center py-12 col-span-2">
                       <p className="text-gray-400 text-sm italic">Belum ada pesanan.</p>
+                      {!isAdmin && (
+                        <button 
+                          onClick={() => setActiveTab('preorder')}
+                          className="mt-4 text-blue-600 font-bold text-sm hover:underline"
+                        >
+                          Mulai Preorder Sekarang
+                        </button>
+                      )}
                     </div>
                   ) : (
                     orders.map((order, idx) => (
@@ -1318,17 +1441,17 @@ export default function App() {
                         key={order.id} 
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1 }}
+                        transition={{ delay: idx * 0.05 }}
                         onClick={() => setSelectedOrder(order)}
                         className="border border-gray-100 rounded-2xl p-4 bg-gray-50/50 hover:bg-white hover:border-blue-100 hover:shadow-md transition-all group cursor-pointer"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Order ID: {order.id?.slice(-6).toUpperCase()}</p>
-                            <h4 className="font-bold text-gray-800">{order.productName || 'Produk'}</h4>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Order ID: {order.id?.slice(-6).toUpperCase()}</p>
+                            <h4 className="font-bold text-gray-800 line-clamp-1">{order.productName || 'Produk'}</h4>
                             <p className="text-[10px] text-gray-500">{order.size} - {order.color}</p>
                           </div>
-                          <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-lg flex items-center gap-1 ${
+                          <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-lg flex items-center gap-1 shrink-0 ${
                             order.status === OrderStatus.PENDING ? 'bg-orange-100 text-orange-600' :
                             order.status === OrderStatus.VERIFIED ? 'bg-green-600 text-white shadow-sm shadow-green-100' :
                             'bg-blue-600 text-white'
@@ -1339,33 +1462,29 @@ export default function App() {
                         </div>
                         <div className="grid grid-cols-2 gap-3 mb-3">
                           <div className="bg-white/50 p-2 rounded-lg">
-                            <p className="text-[10px] text-gray-400 uppercase font-bold">Jumlah</p>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Pesan</p>
                             <p className="text-sm font-bold text-gray-600">{order.quantity} pcs</p>
                           </div>
                           <div className="bg-white/50 p-2 rounded-lg">
-                            <p className="text-[10px] text-gray-400 uppercase font-bold">Estimasi</p>
-                            <p className="text-sm font-bold text-gray-600">Pending</p>
+                            <p className="text-[10px] text-gray-400 uppercase font-bold">Tanggal</p>
+                            <p className="text-sm font-bold text-gray-600">
+                              {order.createdAt ? (order.createdAt as any).toDate().toLocaleDateString() : '-'}
+                            </p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <MapPin className="w-3 h-3" />
+                        {isAdmin && (
+                          <div className="flex items-center gap-2 text-[10px] text-blue-600 font-bold mb-2 truncate">
+                            <UserIcon className="w-3 h-3" />
+                            {order.name}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                          <MapPin className="w-3 h-3 shrink-0" />
                           <span className="truncate">{order.address}</span>
                         </div>
                       </motion.div>
                     ))
                   )}
-                </div>
-              </div>
-
-              {/* Info Card */}
-              <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3 text-amber-800">
-                <Info className="w-5 h-5 shrink-0" />
-                <div>
-                  <p className="text-sm font-bold mb-1">Informasi Pembayaran</p>
-                  <p className="text-xs leading-relaxed opacity-80">
-                    Silakan transfer ke rekening <strong>Bank ABC 123456789 a.n. KOMITS</strong>. 
-                    Upload bukti transfer pada form di samping untuk verifikasi.
-                  </p>
                 </div>
               </div>
             </motion.section>
