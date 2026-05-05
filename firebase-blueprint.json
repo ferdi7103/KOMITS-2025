@@ -1,5 +1,24 @@
 {
   "entities": {
+    "settings": {
+      "title": "Application Settings",
+      "description": "Global settings for the application including stock limits.",
+      "type": "object",
+      "properties": {
+        "stockLimits": {
+          "type": "object",
+          "properties": {
+            "S": { "type": "integer" },
+            "M": { "type": "integer" },
+            "L": { "type": "integer" },
+            "XL": { "type": "integer" },
+            "XXL": { "type": "integer" },
+            "XXXL": { "type": "integer" }
+          }
+        }
+      },
+      "required": ["stockLimits"]
+    },
     "Order": {
       "title": "Order",
       "description": "Preorder information for a custom t-shirt",
@@ -22,6 +41,10 @@
     }
   },
   "firestore": {
+    "/settings/{settingsId}": {
+      "schema": "settings",
+      "description": "Global application settings."
+    },
     "/orders/{orderId}": {
       "schema": "Order",
       "description": "Collection of preorders"

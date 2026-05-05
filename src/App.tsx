@@ -79,7 +79,14 @@ export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [stockLimits, setStockLimits] = useState<Record<Order['size'], number>>({
+    'S': 50, 'M': 50, 'L': 50, 'XL': 50, 'XXL': 20, 'XXXL': 10
+  });
+  const [stockUsed, setStockUsed] = useState<Record<Order['size'], number>>({
+    'S': 0, 'M': 0, 'L': 0, 'XL': 0, 'XXL': 0, 'XXXL': 0
+  });
   const [submitting, setSubmitting] = useState(false);
+  const [editingStock, setEditingStock] = useState(false);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
@@ -140,8 +147,33 @@ export default function App() {
       handleFirestoreError(error, OperationType.GET, 'orders');
     });
 
-    return unsubscribe;
-  }, [user]);
+    const unsubscribeStock = onSnapshot(doc(db, 'settings', 'stock'), (snapshot) => {
+      if (snapshot.exists()) {
+        setStockLimits(snapshot.data().stockLimits);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeStock();
+    };
+  }, [user, isAdmin]);
+
+  useEffect(() => {
+    const usage = orders.reduce((acc, order) => {
+      acc[order.size] = (acc[order.size] || 0) + order.quantity;
+      return acc;
+    }, {} as Record<Order['size'], number>);
+    
+    setStockUsed({
+      'S': usage['S'] || 0,
+      'M': usage['M'] || 0,
+      'L': usage['L'] || 0,
+      'XL': usage['XL'] || 0,
+      'XXL': usage['XXL'] || 0,
+      'XXXL': usage['XXXL'] || 0
+    });
+  }, [orders]);
 
   const syncToSheet = async (orderData: Partial<Order> & { id?: string }) => {
     try {
@@ -196,6 +228,15 @@ export default function App() {
 
     setSubmitting(true);
     try {
+      // Re-verify stock before submission
+      const currentUsed = stockUsed[formData.size];
+      const limit = stockLimits[formData.size];
+      if (currentUsed + formData.quantity > limit) {
+        alert("Maaf, stok untuk ukuran ini baru saja habis atau tidak mencukupi.");
+        setSubmitting(false);
+        return;
+      }
+
       const orderData = {
         userId: user.uid,
         ...formData,
@@ -235,18 +276,45 @@ export default function App() {
         status: newStatus,
         updatedAt: serverTimestamp()
       });
+      
+      // Find order for notification
+      const order = orders.find(o => o.id === orderId);
+      if (order) {
+        // Notify via WA
+        fetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: order.phone,
+            name: order.name,
+            status: newStatus,
+            orderId: orderId.slice(-6).toUpperCase()
+          })
+        }).catch(e => console.warn("WA Notification failed:", e));
+
+        // Sync to Sheet
+        syncToSheet({ ...order, status: newStatus });
+      }
+
       // Update local state for modal if open
       if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
-        syncToSheet({ ...selectedOrder, status: newStatus });
-      } else {
-        // Find order in list if not selected
-        const order = orders.find(o => o.id === orderId);
-        if (order) syncToSheet({ ...order, status: newStatus });
       }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
     }
+  };
+
+  const saveStockLimits = async (newLimits: Record<Order['size'], number>) => {
+    if (!isAdmin) return;
+    try {
+      const { setDoc } = await import('firebase/firestore');
+      const stockRef = doc(db, 'settings', 'stock');
+      await setDoc(stockRef, { stockLimits: newLimits }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'settings/stock');
+    }
+    setEditingStock(false);
   };
 
   const handleDeleteOrder = async (orderId: string) => {
@@ -323,10 +391,75 @@ export default function App() {
             </p>
           </div>
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-          <div className="absolute bottom-0 right-12 opacity-10">
-            <Shirt size={200} />
-          </div>
-        </motion.div>
+            <div className="absolute bottom-0 right-12 opacity-10">
+              <Shirt size={200} />
+            </div>
+          </motion.div>
+
+          {isAdmin && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white border border-red-200 rounded-3xl p-6 mb-8 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-red-600 flex items-center gap-2">
+                  <Info className="w-5 h-5" />
+                  Admin: Manajemen Stok
+                </h3>
+                <button 
+                  onClick={() => setEditingStock(!editingStock)}
+                  className="text-sm font-bold text-blue-600 hover:underline"
+                >
+                  {editingStock ? 'Batal Edit' : 'Edit Kuota'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                {(['S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const).map(size => (
+                  <div key={size} className={`p-3 rounded-2xl border transition-all ${stockUsed[size] >= stockLimits[size] ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'}`}>
+                    <p className="text-xs font-bold text-gray-400 mb-1">SIZE {size}</p>
+                    {editingStock ? (
+                      <input 
+                        type="number"
+                        className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm font-bold"
+                        defaultValue={stockLimits[size]}
+                        onBlur={(e) => {
+                          const newLimit = parseInt(e.target.value) || 0;
+                           // We don't save immediately on blur for simplicity, 
+                           // maybe user should click a save button or we do it here
+                        }}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          setStockLimits(prev => ({ ...prev, [size]: val }));
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-lg font-bold">{stockUsed[size]}</span>
+                        <span className="text-xs text-gray-400">/ {stockLimits[size]}</span>
+                      </div>
+                    )}
+                    <div className="w-full bg-gray-200 h-1 rounded-full mt-2 overflow-hidden">
+                      <div 
+                        className={`h-full transition-all ${stockUsed[size] >= stockLimits[size] ? 'bg-red-500' : 'bg-blue-500'}`}
+                        style={{ width: `${Math.min(100, (stockUsed[size] / (stockLimits[size] || 1)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {editingStock && (
+                <button 
+                  onClick={() => saveStockLimits(stockLimits)}
+                  className="mt-6 w-full bg-blue-600 text-white font-bold py-2 rounded-xl hover:bg-blue-700 transition-colors"
+                >
+                  Simpan Semua Perubahan Kuota
+                </button>
+              )}
+            </motion.div>
+          )}
 
         {!user ? (
           <div className="text-center bg-white border border-gray-200 rounded-3xl p-12 shadow-sm">
@@ -401,20 +534,27 @@ export default function App() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Ukuran</label>
-                      <select 
-                        className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
-                        value={formData.size}
-                        onChange={e => setFormData({ ...formData, size: e.target.value as Order['size'] })}
-                      >
-                        {['S', 'M', 'L', 'XL', 'XXL', 'XXXL'].map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Ukuran</label>
+                        <select 
+                          className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"
+                          value={formData.size}
+                          onChange={e => setFormData({ ...formData, size: e.target.value as Order['size'] })}
+                        >
+                          {(['S', 'M', 'L', 'XL', 'XXL', 'XXXL'] as const).map(s => {
+                            const used = stockUsed[s] || 0;
+                            const limit = stockLimits[s] || 0;
+                            const isSoldOut = used >= limit;
+                            return (
+                              <option key={s} value={s} disabled={isSoldOut}>
+                                {s} {isSoldOut ? '(SOLD OUT)' : `(Stok: ${limit - used})`}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
                       <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">Warna</label>
                       <select 
                         className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-3 focus:ring-2 focus:ring-blue-600 focus:bg-white outline-none transition-all appearance-none"

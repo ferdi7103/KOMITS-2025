@@ -50,6 +50,11 @@ service cloud.firestore {
         && data.updatedAt == request.time;
     }
 
+    match /settings/{settingsId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /orders/{orderId} {
       allow get: if isOwner(existing().userId) || isAdmin();
       allow list: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
