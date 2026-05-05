@@ -50,11 +50,28 @@ import {
   FileDown,
   Printer,
   Download,
-  Search
+  Search,
+  LayoutDashboard,
+  BarChart3,
+  PieChart as PieChartIcon,
+  TrendingUp
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  PieChart, 
+  Pie, 
+  Cell,
+  Legend
+} from 'recharts';
 import { db, auth } from './lib/firebase';
 import { Order, OrderStatus, OperationType, Product } from './types';
 
@@ -96,6 +113,7 @@ export default function App() {
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [activeAdminTab, setActiveAdminTab] = useState<'orders' | 'stats' | 'products'>('orders');
 
   // Product Form State
   const [productFormData, setProductFormData] = useState({
@@ -542,6 +560,42 @@ export default function App() {
     doc.save("Label_Pengiriman_KOMITS_2025.pdf");
   };
 
+  const getAnalytics = () => {
+    const colorData: Record<string, number> = {};
+    const statusData: Record<string, number> = {
+      'Pending': 0,
+      'Verified': 0,
+      'Shipped': 0,
+      'Processing': 0,
+      'Completed': 0
+    };
+    let totalRevenue = 0;
+
+    orders.forEach(order => {
+      // Color Stats
+      colorData[order.color] = (colorData[order.color] || 0) + order.quantity;
+      
+      // Status Stats
+      const statusLabel = order.status.charAt(0).toUpperCase() + order.status.slice(1);
+      statusData[statusLabel] = (statusData[statusLabel] || 0) + 1;
+
+      // Revenue Calculation
+      if (order.status !== OrderStatus.PENDING) {
+        const product = products.find(p => p.id === order.productId);
+        const price = product?.price || 0;
+        totalRevenue += price * order.quantity;
+      }
+    });
+
+    const colorChartData = Object.entries(colorData).map(([name, value]) => ({ name, value }));
+    const statusChartData = Object.entries(statusData).map(([name, value]) => ({ name, value }));
+
+    return { colorChartData, statusChartData, totalRevenue };
+  };
+
+  const { colorChartData, statusChartData, totalRevenue } = getAnalytics();
+  const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#F5F7FA]">
@@ -591,6 +645,32 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 pt-8">
+        {isAdmin && (
+          <div className="flex gap-2 mb-8 bg-gray-100 p-1.5 rounded-2xl w-fit">
+            <button 
+              onClick={() => setActiveAdminTab('orders')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'orders' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              Pesanan
+            </button>
+            <button 
+              onClick={() => setActiveAdminTab('stats')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'stats' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              Statistik
+            </button>
+            <button 
+              onClick={() => setActiveAdminTab('products')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all ${activeAdminTab === 'products' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              <ShoppingBag className="w-4 h-4" />
+              Produk
+            </button>
+          </div>
+        )}
+
         {/* Banner */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -610,11 +690,106 @@ export default function App() {
             </div>
           </motion.div>
 
-          {isAdmin && (
+          {isAdmin && activeAdminTab === 'stats' && (
             <motion.div 
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="bg-white border border-blue-200 rounded-3xl p-6 mb-8 shadow-sm"
+              className="space-y-8 mb-12"
+            >
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="bg-blue-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
+                    <TrendingUp className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Total Pendapatan</p>
+                  <h4 className="text-2xl font-black text-gray-900">Rp {totalRevenue.toLocaleString()}</h4>
+                  <p className="text-[10px] text-gray-400 mt-1">*Berdasarkan pesanan non-pending</p>
+                </div>
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="bg-green-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  </div>
+                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Pesanan Sukses</p>
+                  <h4 className="text-2xl font-black text-gray-900">{orders.filter(o => o.status === OrderStatus.COMPLETED || o.status === OrderStatus.VERIFIED).length}</h4>
+                  <p className="text-[10px] text-gray-400 mt-1">Verified & Completed</p>
+                </div>
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                  <div className="bg-orange-50 w-10 h-10 rounded-xl flex items-center justify-center mb-4">
+                    <Loader2 className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <p className="text-xs font-bold text-gray-400 uppercase mb-1">Menunggu Verifikasi</p>
+                  <h4 className="text-2xl font-black text-gray-900">{orders.filter(o => o.status === OrderStatus.PENDING).length}</h4>
+                  <p className="text-[10px] text-gray-400 mt-1">Status: Pending</p>
+                </div>
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-h-[400px]">
+                  <h4 className="font-bold mb-6 flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-blue-600" />
+                    Popularitas Warna
+                  </h4>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={colorChartData}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                        <XAxis dataKey="name" fontSize={11} stroke="#9CA3AF" />
+                        <YAxis hide />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                          itemStyle={{ fontWeight: 'bold' }}
+                        />
+                        <Bar 
+                          dataKey="value" 
+                          fill="#2563eb" 
+                          radius={[6, 6, 0, 0]} 
+                          animationDuration={1500}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm min-h-[400px]">
+                  <div className="flex items-center justify-between mb-6">
+                    <h4 className="font-bold flex items-center gap-2">
+                      <PieChartIcon className="w-4 h-4 text-indigo-600" />
+                      Status Pembayaran
+                    </h4>
+                  </div>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={statusChartData}
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {statusChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                        />
+                        <Legend iconType="circle" />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {isAdmin && activeAdminTab === 'products' && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white border border-blue-100 rounded-3xl p-6 mb-8 shadow-sm"
             >
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-blue-600 flex items-center gap-2">
@@ -853,7 +1028,7 @@ export default function App() {
             </motion.div>
           )}
 
-        {!user ? (
+        {!user && activeAdminTab !== 'stats' ? (
           <div className="space-y-8">
             {/* Search Tool for Non-Logged In */}
             <motion.div 
@@ -934,7 +1109,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        ) : (
+        ) : user && activeAdminTab === 'orders' ? (
           <div className="grid md:grid-cols-2 gap-8">
             {/* Form Section */}
             <motion.section 
@@ -1195,7 +1370,7 @@ export default function App() {
               </div>
             </motion.section>
           </div>
-        )}
+        ) : null}
       </main>
 
       {/* Order Detail Modal */}
