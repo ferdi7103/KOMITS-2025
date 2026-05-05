@@ -719,18 +719,71 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2rem] p-6 sm:p-8 mb-8 text-white relative overflow-hidden"
+            className="bg-gradient-to-br from-blue-600 to-indigo-800 rounded-[2.5rem] p-8 sm:p-10 mb-10 text-white relative overflow-hidden shadow-xl shadow-blue-900/10"
           >
-            <div className="relative z-10">
-              <p className="text-blue-100 font-mono text-[10px] sm:text-xs uppercase tracking-widest mb-2">Exclusive Release</p>
-              <h2 className="text-2xl sm:text-4xl font-extrabold mb-3 leading-tight">KOMITS 2025<br />Pre Order System</h2>
-              <p className="text-blue-100 max-w-sm text-sm sm:text-base opacity-90 leading-relaxed">
-                Dapatkan kaos official KOMITS 2025 edisi terbatas. Pilih ukuran, warna favorit, dan miliki sekarang!
+            <div className="relative z-10 sm:max-w-md">
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-white/10 backdrop-blur-md border border-white/20 w-fit px-3 py-1 rounded-full mb-6"
+              >
+                <p className="text-white font-mono text-[10px] uppercase tracking-[0.2em] font-bold">Limited Anniversary Edition</p>
+              </motion.div>
+              <h2 className="text-3xl sm:text-5xl font-black mb-4 leading-tight tracking-tight">
+                KOMITS 2025<br />
+                <span className="text-blue-300">Official Store</span>
+              </h2>
+              <p className="text-blue-100 text-sm sm:text-lg opacity-90 leading-relaxed font-medium mb-8">
+                Selamat Datang di Official Komits 2025 Merchandise. Koleksi eksklusif untuk mendukung pergerakan sosial.
               </p>
+              
+              {!user && (
+                <button 
+                  onClick={handleLogin}
+                  className="bg-white text-blue-700 font-black px-8 py-4 rounded-2xl flex items-center gap-2 hover:bg-blue-50 transition-all active:scale-95 shadow-lg"
+                >
+                  <ShoppingBag className="w-5 h-5" />
+                  BELANJA SEKARANG
+                </button>
+              )}
             </div>
-            <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4" />
-            <div className="absolute bottom-0 right-4 sm:right-12 opacity-10">
-              <Shirt size={120} className="sm:w-[200px] sm:h-[200px]" />
+
+            {/* Merchandise Image Stack */}
+            <div className="absolute top-0 right-0 h-full w-full pointer-events-none overflow-hidden sm:block">
+              {/* Product 1: Black T-Shirt */}
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, rotate: 10, x: 100 }}
+                animate={{ opacity: 0.6, scale: 1, rotate: -15, x: 0 }}
+                transition={{ duration: 1.2, ease: "easeOut" }}
+                className="absolute -right-12 top-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96"
+              >
+                <img 
+                  src="https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&q=80&w=600" 
+                  alt="Merchandise Mockup 1" 
+                  className="w-full h-full object-contain filter drop-shadow-2xl"
+                  referrerPolicy="no-referrer"
+                />
+              </motion.div>
+
+              {/* Product 2: White Hoodie / Sweatshirt */}
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.8, rotate: -20, x: 100 }}
+                animate={{ opacity: 0.4, scale: 0.9, rotate: 10, x: 40 }}
+                transition={{ duration: 1.5, ease: "easeOut", delay: 0.3 }}
+                className="absolute right-12 bottom-0 w-48 h-48 sm:w-80 sm:h-80"
+              >
+                <img 
+                  src="https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=600" 
+                  alt="Merchandise Mockup 2" 
+                  className="w-full h-full object-contain filter drop-shadow-2xl"
+                  referrerPolicy="no-referrer"
+                />
+              </motion.div>
+
+              {/* Decorative Blur Orbs */}
+              <div className="absolute top-1/4 right-0 w-64 h-64 bg-blue-400 rounded-full blur-[100px] opacity-20" />
+              <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-indigo-400 rounded-full blur-[120px] opacity-20" />
             </div>
           </motion.div>
         )}
