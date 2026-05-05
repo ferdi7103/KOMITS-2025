@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Preorder information for a custom t-shirt",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "size": { "type": "string", "enum": ["S", "M", "L", "XL", "XXL", "XXXL"] },
+        "color": { "type": "string" },
+        "quantity": { "type": "integer" },
+        "paymentProofUrl": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "verified", "processing", "shipped", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "name", "phone", "address", "size", "color", "quantity", "paymentProofUrl"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of preorders"
+    }
+  }
+}
