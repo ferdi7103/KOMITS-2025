@@ -3,8 +3,11 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
+import { Resend } from 'resend';
 
 dotenv.config();
+
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Initialize Firebase Admin (uses environment variables automatically if set up)
 // In AI Studio, we can initialize with default app if credentials are in env or we can skip for now
@@ -87,6 +90,62 @@ async function startServer() {
     
     await sendWA(phone, message);
     res.json({ status: "success" });
+  });
+
+  // API Route for Email Confirmation
+  app.post("/api/send-confirmation", async (req, res) => {
+    const { email, name, orderDetails, orderId } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    if (!resend) {
+      console.warn("RESEND_API_KEY is not set. Mocking email send.");
+      console.log(`[Email MOCK to ${email}]: Order confirmation for ${name}`);
+      return res.json({ status: "skipped", reason: "no_api_key" });
+    }
+
+    try {
+      const shareUrl = process.env.VITE_APP_URL || "https://ais-pre-o6pnumq2cgch7bp54qy3wz-214655520165.asia-east1.run.app";
+      const { data, error } = await resend.emails.send({
+        from: 'KOMITS 2025 <onboarding@resend.dev>', // Use verified domain in production
+        to: [email],
+        subject: `Konfirmasi Pesanan KOMITS 2025 - ID: ${orderId}`,
+        html: `
+          <div style="font-family: sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #2563eb;">Halo, ${name}!</h2>
+            <p>Terima kasih telah memesan merchandise resmi <strong>KOMITS 2025</strong>.</p>
+            <p>Pesanan Anda telah kami terima dengan ID: <strong>${orderId}</strong>.</p>
+            
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0; font-size: 16px;">Detail Pesanan:</h3>
+              <p style="margin: 5px 0;">Produk: ${orderDetails.productName}</p>
+              <p style="margin: 5px 0;">Ukuran: ${orderDetails.size}</p>
+              <p style="margin: 5px 0;">Warna: ${orderDetails.color}</p>
+              <p style="margin: 5px 0;">Jumlah: ${orderDetails.quantity} pcs</p>
+              <p style="margin: 5px 0;">Total: Rp ${orderDetails.totalAmount.toLocaleString()}</p>
+            </div>
+
+            <p>Anda dapat memantau status pesanan Anda melalui link berikut:</p>
+            <a href="${shareUrl}" style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Cek Status Pesanan</a>
+            
+            <p style="margin-top: 30px; font-size: 12px; color: #666;">Jika Anda tidak merasa melakukan pesanan ini, silakan abaikan email ini.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #999; text-align: center;">&copy; 2025 KOMITS - Kepedulian OTM ITS</p>
+          </div>
+        `,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      res.json({ status: "success", data });
+    } catch (error) {
+      console.error("Email Send Error:", error);
+      res.status(500).json({ error: "Failed to send email" });
+    }
   });
 
   // API Route for Public Status Check by Phone

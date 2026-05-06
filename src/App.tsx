@@ -242,6 +242,18 @@ export default function App() {
     }
   };
 
+  const sendConfirmationEmail = async (email: string, name: string, orderDetails: any, orderId: string) => {
+    try {
+      await fetch('/api/send-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name, orderDetails, orderId })
+      });
+    } catch (error) {
+      console.warn('Email confirmation failed:', error);
+    }
+  };
+
   const handleLogin = async () => {
     try {
       const provider = new GoogleAuthProvider();
@@ -311,6 +323,17 @@ export default function App() {
       
       // Sync to Sheet
       syncToSheet({ id: docRef.id, ...orderData });
+
+      // Send Email Confirmation
+      if (user.email) {
+        sendConfirmationEmail(user.email, formData.name, {
+          productName: selectedProduct.name,
+          size: formData.size,
+          color: formData.color,
+          quantity: formData.quantity,
+          totalAmount: selectedProduct.price * formData.quantity
+        }, docRef.id.slice(-6).toUpperCase());
+      }
 
       setSuccess(true);
       setFormData({
