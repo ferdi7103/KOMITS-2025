@@ -28,6 +28,23 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Read-only, fixed-origin bridge keeps community content current without CORS dependencies.
+  const communityEndpoints = new Set(['about', 'donation-summary', 'donation-reports', 'marketplace', 'jobs', 'beneficiaries']);
+  app.get('/api/community/:section', async (req, res) => {
+    if (!communityEndpoints.has(req.params.section)) return res.status(404).json({ error: 'Unknown section' });
+    try {
+      const upstream = await fetch(`https://komits2025.org/api/${req.params.section}`, {
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!upstream.ok) throw new Error('Community source unavailable');
+      const data = await upstream.json();
+      res.set('Cache-Control', 'public, max-age=60').json(data);
+    } catch {
+      res.status(502).json({ error: 'Community source unavailable' });
+    }
+  });
+
+
   const sendWA = async (phone: string, message: string) => {
     const apiKey = process.env.WHATSAPP_API_KEY;
     if (!apiKey) {
