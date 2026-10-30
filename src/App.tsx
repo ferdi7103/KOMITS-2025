@@ -74,6 +74,7 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import Community, { communityMenu, readPage, type CommunityPage } from './Community';
 import { db, auth } from './lib/firebase';
 import { Order, OrderStatus, OperationType, Product } from './types';
 
@@ -101,6 +102,12 @@ const handleFirestoreError = (error: unknown, operationType: OperationType, path
 const ADMIN_EMAILS = ['ferdy.ap@gmail.com'];
 
 export default function App() {
+  const [page, setPage] = useState<CommunityPage>(readPage);
+  useEffect(() => {
+    const syncPage = () => setPage(readPage());
+    window.addEventListener('hashchange', syncPage);
+    return () => window.removeEventListener('hashchange', syncPage);
+  }, []);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -116,7 +123,7 @@ export default function App() {
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [activeTab, setActiveTab] = useState<'preorder' | 'history' | 'stats' | 'products'>('preorder');
+  const [activeTab, setActiveTab] = useState<'preorder' | 'history' | 'stats' | 'products' | 'form'>('preorder');
   const [activeAdminTab, setActiveAdminTab] = useState<'orders' | 'stats' | 'products'>('orders');
 
   // Product Form State
@@ -680,6 +687,15 @@ export default function App() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 pt-8">
+        <nav aria-label="Menu utama" className="mb-8 flex flex-wrap gap-2">
+          {communityMenu.map(([id, label]) => (
+            <a key={id} href={`#${id}`} aria-current={page === id ? 'page' : undefined}
+              className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${page === id ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-blue-50'}`}>
+              {label}
+            </a>
+          ))}
+        </nav>
+        {page !== 'shop' ? <Community page={page} /> : <>
         {user && (
           <div className="mb-10 -mx-4 px-4 sm:mx-0 sm:px-0">
             <div className="flex gap-2 bg-gray-100/80 backdrop-blur-sm p-1.5 rounded-[1.25rem] w-fit max-w-full overflow-x-auto no-scrollbar scroll-smooth">
@@ -1566,6 +1582,7 @@ export default function App() {
             </motion.section>
           </div>
         ) : null}
+        </>}
       </main>
 
       {/* Order Detail Modal */}

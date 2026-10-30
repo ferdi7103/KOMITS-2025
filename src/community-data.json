@@ -1,0 +1,162 @@
+{
+  "retrievedAt": "2026-10-30",
+  "about": {
+    "about": "KOMITS 2025 lahir dari inisiatif sebagian orang tua mahasiswa tahun 2025 yang tergabung dalam grup WhatsApp. Semangat kebersamaan dan keinginan untuk saling mendukung telah mengumpulkan <strong>lebih dari 1.025 anggota</strong> dalam waktu singkat.\nKegiatan utama adalah kegiatan sosial terkait Pendidikan anak di masa perkuliahan di ITS, juga pemberdayaan mahasiswa dan OTM agar dapat menambah dana untuk pembiayaan anak kuliah di ITS.\n\nDukungan resmi dari Ikatan Orang Tua Mahasiswa (IKOMA) ITS memberikan legitimasi dan arah yang jelas bagi pergerakan komunitas ini. Ini adalah bukti nyata kepedulian bersama untuk masa depan mahasiswa.",
+    "vision": "Membersamai mahasiswa ITS hingga meraih gelar sarjana dengan dukungan penuh dari komunitas orang tua dan IKOMA.",
+    "mission": "<strong>Misi 1: Bantuan Finansial</strong>\nMenyediakan bantuan finansial bagi mahasiswa yang membutuhkan agar dapat fokus pada studi mereka.\n\n<strong>Misi 2: Sarana Belajar</strong>\nMendukung pengadaan sarana dan prasarana belajar yang menunjang perkuliahan mahasiswa.\n\n<strong>Misi 3: Sinergi IKOMA</strong>\nMembangun sinergi yang kuat dengan IKOMA ITS untuk program-program berkelanjutan.",
+    "org": [
+      {
+        "role": "Pembina",
+        "name": "-"
+      },
+      {
+        "role": "Pengawas",
+        "name": "Dr. Agus Widiarta, S.Sos, Msi\nHenrikus Andi Budiyanto, S.T,M.M."
+      },
+      {
+        "role": "Ketua Umum",
+        "name": "Julita Paramitasari"
+      },
+      {
+        "role": "Ketua I",
+        "name": "Ria Asrin"
+      },
+      {
+        "role": "Ketua 2",
+        "name": "Erna Rahmawati"
+      },
+      {
+        "role": "Sekretaris",
+        "name": "Pramuri Harumdhani\nMufidah Arliza Q"
+      },
+      {
+        "role": "Bendahara",
+        "name": "Dede Rosdiana\nMeiria Susilawati"
+      },
+      {
+        "role": "Bidang Sosial dan Operasional",
+        "name": "Dian Yusnita P (koordinator)\nErwin Bayu Aji\nNur Fauziah\nKunto Priyo Jatmiko"
+      },
+      {
+        "role": "Bidang Humas, Teknologi Informasi dan Dana Usaha",
+        "name": "Farah Dwinita (koordinator)\nNasrul Nasihati\nAjeng Sekar Tanjung Sari\nJamilah Zahroh\nFerdinandus Ary Prabowo"
+      }
+    ],
+    "contact": {
+      "email": "info@komits2025.org",
+      "instagram": "https://instagram.com/komits2025ig",
+      "whatsapp": "https://wa.me/6282336121525"
+    }
+  },
+  "donation-summary": {
+    "collectedDonation": "4307500",
+    "distributedDonation": "0",
+    "activeBeneficiaries": "1",
+    "totalBeneficiaries": "1",
+    "lastUpdated": "2026-04-07"
+  },
+  "donation-reports": [
+    {
+      "title": "Laporan keuangan - Januari 2026",
+      "description": "Laporan keuangan KOMITS2025 - Januari 2026",
+      "downloadUrl": "/documents/1767604129500-Laporan Keuangan KOMITS.xlsx - 202601.pdf",
+      "date": "2026-01-05",
+      "id": "a1792d7a-20f4-4ada-879e-b5ae99589e10"
+    },
+    {
+      "title": "Laporan Keuangan Maret 2026",
+      "description": "Laporan Keuangan KOMITS2025 Jan-Mar 2026\n",
+      "downloadUrl": "/documents/1775559203348-LAPORAN KEUANGAN KOMITS JAN-MAR 2026.pdf",
+      "date": "2026-04-07",
+      "id": "266de9d0-649d-414e-b527-cafb4e1fddc3"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "KOMITS-001",
+      "org": "KOMITS2025",
+      "role": "Web Admin KOMITS2025",
+      "minReq": "Mahasiswa ITS aktif\nBisa maintain content web KOMITS2025\nBisa dasar pemrograman untuk customisasi Web",
+      "salary": "TBD",
+      "location": "Remote",
+      "contact": "+6282336121525",
+      "postingDate": "2026-01-05",
+      "active": true
+    },
+    {
+      "id": "KOMITS-002",
+      "org": "KOMITS2025",
+      "role": "Sosmed Admin KOMITS2025",
+      "minReq": "Mahasiswa aktif ITS\nBisa manage social media KOMITS2025\nBisa bikin banner/video untuk keperluan content",
+      "salary": "TBD",
+      "location": "Remote",
+      "contact": "+6282336121525",
+      "postingDate": "2026-01-05",
+      "active": true
+    }
+  ],
+  "marketplace": [
+    {
+      "id": "UMKM-0002",
+      "title": "Juragan Laundry",
+      "images": [
+        "1767587853294-juraganlaundry.png"
+      ],
+      "whatsapp": "+6281330726543",
+      "categories": "Laundry",
+      "note": "Bumi Marina Emas Selatan E-23\nJl Dharmahusada I no 25\nJl Jambangan Kebon Agung no 25A"
+    },
+    {
+      "id": "UMKM-0003",
+      "title": "Dapur Yumei",
+      "images": [
+        "1767579026572-yumei-logo.jpeg",
+        "1767579031584-yumei-menu.jpeg"
+      ],
+      "whatsapp": "+6287872155641",
+      "categories": "Dendeng Basah#Rendang#Ayam Bakar",
+      "note": "Pengiriman dari Bogor\nSetiap Rabu, Kamis, Jumat"
+    },
+    {
+      "id": "UMKM-0001",
+      "title": "Amaraya",
+      "images": [
+        "1767582811362-amaraya-logo.jpeg"
+      ],
+      "whatsapp": "+628122043389",
+      "categories": "Fashion",
+      "note": "https://shopee.co.id/by.amaraya"
+    },
+    {
+      "title": "Mila Craft",
+      "whatsapp": "+6281230040227",
+      "categories": "Sprei",
+      "note": "Pengiriman dari Jombang - Jawa Timur",
+      "images": [
+        "1767587750666-milacraft.jpg"
+      ],
+      "id": "fee97e5f-bef2-4771-8245-87f6981ad478"
+    },
+    {
+      "title": "Warteg Putra Bahari UTY Glagahsari",
+      "whatsapp": "",
+      "categories": "food#warteg#UTY Glagahsari",
+      "note": "Warteg Putra Bahari\nJl Glagahsari, Warungboto\nUmbulharjo, Yogyakarta\n(Utara Alfmart Glagahsari)",
+      "video": "https://komits2025.org/images/putrabahari.mp4",
+      "images": [
+        "1768797508100-putrabahari.png"
+      ],
+      "id": "928454b5-77ef-4162-8eef-2bb1eebd74a0"
+    }
+  ],
+  "beneficiaries": [
+    {
+      "id": "KOMITS-0001",
+      "name": "Novi",
+      "type": "Laptop",
+      "date": "2025-11-01",
+      "note": "Pinjaman sampai beasiswa keluar",
+      "amount": ""
+    }
+  ]
+}
